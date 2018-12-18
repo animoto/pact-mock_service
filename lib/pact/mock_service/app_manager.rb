@@ -26,21 +26,33 @@ module Pact
         raise "Currently only services on localhost are supported" unless uri.host == 'localhost'
         uri.port = nil if options[:find_available_port]
 
-        app = Pact::MockService.new(
-          name: name,
-          log_file: create_log_file(name),
-          pact_dir: pact_dir,
-          pact_specification_version: options.fetch(:pact_specification_version)
-        )
-        register(app, uri.port)
+        app, registration_klass = if options[:standalone]
+                                    Struct.new("StandaloneMockService",
+                                               :name,
+                                               :pact_dir,
+                                               :pact_specification_version)
+
+                                    [Struct::StandaloneMockService.new(name,
+                                                                       pact_dir,
+                                                                       options[:pact_specification_version]
+                                    ), 'StandaloneRegistration']
+                                  else
+                                    [Pact::MockService.new(
+                                        name:                       name,
+                                        log_file:                   create_log_file(name),
+                                        pact_dir:                   pact_dir,
+                                        pact_specification_version: options[:pact_specification_version]
+                                    ), 'AppRegistration']
+                                  end
+        register(app, uri.port, registration_klass)
       end
 
-      def register(app, port = nil)
+      def register(app, port = nil, registration_klass = 'AppRegistration')
         if port
           existing = existing_app_on_port(port)
           raise "Port #{port} is already being used by #{existing}" if existing and not existing == app
         end
-        app_registration = register_app(app, port)
+        app_registration = register_app(app, port, registration_klass)
         app_registration.spawn
         app_registration.port
       end
@@ -107,8 +119,8 @@ module Pact
         @app_registrations
       end
 
-      def register_app(app, port)
-        app_registration = AppRegistration.new(app: app, port: port)
+      def register_app(app, port, registration_klass)
+        app_registration = Pact::MockService::const_get(registration_klass).new(app: app, port: port)
         app_registrations << app_registration
         app_registration
       end
@@ -152,6 +164,28 @@ module Pact
         @port = @server.port
         @spawned = true
         logger.info "Started on port #{port}"
+      end
+    end
+
+    class StandaloneRegistration < AppRegistration
+
+      def kill
+        logger.debug "Supposed to be stopping"
+        @spawned = false
+      end
+
+      def spawn
+        logger.info "Using existing standalone app #{self}..."
+        cmd = ['pact-mock-service', 'start',]
+
+
+        @server  = app
+        @spawned = true
+        logger.info "Started on port #{port}"
+      end
+
+      def is_a_mock_service?
+        true
       end
     end
   end
