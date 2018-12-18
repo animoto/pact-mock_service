@@ -171,13 +171,16 @@ module Pact
 
       def kill
         logger.debug "Supposed to be stopping"
-        @spawned = false
+
+        `pact-mock-service stop`
+
+         @spawned = false
       end
 
       def spawn
         logger.info "Using existing standalone app #{self}..."
-        cmd = ['pact-mock-service', 'start',]
-
+        system('pact-mock-service start --consumer=client_service --provider=digital_river_proxy --pact-dir=./spec/pacts/')
+        sleep 3
 
         @server  = app
         @spawned = true
