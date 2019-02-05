@@ -179,7 +179,7 @@ module Pact
 
       def spawn
         logger.info "Using existing standalone app #{self}..."
-        system('pact-mock-service start --consumer=client_service --provider=digital_river_proxy --pact-dir=./spec/pacts/')
+        system('pact-mock-service start --consumer=client_service --log=./test_output/pact_standalone.log --provider=digital_river_proxy --pact-dir=./spec/pacts/')
         sleep 3
 
         @server  = app
